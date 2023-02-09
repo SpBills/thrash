@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bcrypt = "0.14.0"
-clap = "4.1.4"
+clap = { version = "4.1.4", features = ["derive"] }
+itertools = "0.10.5"
 md5 = "0.7.0"
 rayon = "1.6.1"
