@@ -1,6 +1,6 @@
 # Thrash
 
-A copy-cat `hashcat` utility.
+A copy-cat `hashcat` utility implemented semi-functionally.
 
 ## How to use
 
