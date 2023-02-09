@@ -43,53 +43,41 @@ enum HashType {
     MD5,
 }
 
-/// An unhashed list of possibilities to use in any attack.
-struct UnhashedList(Vec<String>);
+/// Generator for a character cartesian product.
+struct AllStringIter(String, u8);
 
-/// An array of unhashed, hashed objects.
-/// Potentially uses a lot of memory.
-/// Vec<(original, hashed)>
-struct Hash(Vec<(String, String)>);
-
-impl UnhashedList {
-    /// Takes a list and generates an MD5 hash.
-    /// NOTE: Introduces a copy. Maybe RAM intensive for a short while.
-    fn compute_array_md5_hash(&self) -> Hash {
-        let h = self
-            .0
-            .par_iter()
-            .map(|u| (u.to_owned(), format!("{:?}", md5::compute(u))))
-            .collect::<Vec<(String, String)>>();
-
-        Hash(h)
+impl AllStringIter {
+    fn new(n: u8) -> Self {
+        Self(String::new(), n)
     }
 }
 
-impl Hash {
-    fn compare_hashes(&self, to_find: &str) -> Option<String> {
-        self.0.par_iter().find_map_first(|f| match f.1 == to_find {
-            true => Some(f.0.clone()),
-            false => None,
-        })
+impl Iterator for AllStringIter {
+    type Item = String;
+
+    fn next(&mut self) -> Option<String> {
+        let mut i = self.0.len();
+        while let Some('z') = self.0.chars().last() {
+            self.0.pop();
+        }
+
+        if self.0.is_empty() {
+            i += 1
+        } else {
+            let c = self.0.pop().unwrap();
+            self.0.push(std::char::from_u32(c as u32 + 1).unwrap());
+        }
+
+        if i == self.1 as usize {
+            return None;
+        }
+
+        while self.0.len() < i {
+            self.0.push('a');
+        }
+
+        Some(self.0.clone())
     }
-}
-
-/// generates an alphabetical array of characters up to n characters long.
-/// [a, b, ..., z, aa, ab, ..., az, ..., zz]
-/// currently extraordinarily very inefficient
-fn generate_alphabet_array_n(n: u8) -> UnhashedList {
-    let l = (1..n + 1)
-        .into_par_iter()
-        .flat_map(|i| {
-            (0..i)
-                .map(|_| ALPHABET.map(|c| String::from(c)))
-                .multi_cartesian_product()
-                .par_bridge()
-                .map(|p| p.join(""))
-        })
-        .collect::<Vec<String>>();
-
-    UnhashedList(l)
 }
 
 /// takes all `types` and performs a brute force attack using each, returning the result.
@@ -97,9 +85,12 @@ fn brute(types: Vec<HashType>, hash: String, len: u8) -> Vec<Option<String>> {
     types
         .iter()
         .map(|hashtype| match hashtype {
-            HashType::MD5 => generate_alphabet_array_n(len)
-                .compute_array_md5_hash()
-                .compare_hashes(&hash),
+            HashType::MD5 => AllStringIter::new(len).par_bridge().find_map_first(|f| {
+                match format!("{:?}", md5::compute(&f)) == hash {
+                    true => Some(f),
+                    false => None,
+                }
+            }),
             HashType::BCrypt => unimplemented!(),
         })
         .collect::<Vec<Option<String>>>()
