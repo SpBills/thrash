@@ -1,13 +1,6 @@
 use clap::Parser;
-use itertools::Itertools;
-use rayon::prelude::IntoParallelRefIterator;
 
 use rayon::prelude::*;
-
-static ALPHABET: [char; 26] = [
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
-    't', 'u', 'v', 'w', 'x', 'y', 'z',
-];
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -25,17 +18,12 @@ struct Args {
     md5: bool,
 
     /// The possible largest length the raw password string can be.
-    /// Defaults to 64
-    #[arg(short, long, default_value_t = 3)]
+    /// Note that this will take a long time!
+    #[arg(short, long, default_value_t = 6)]
     password_length: u8,
 
     #[arg(short, long)]
     input: String,
-}
-
-enum Method {
-    Brute,
-    Library,
 }
 
 enum HashType {
@@ -68,7 +56,7 @@ impl Iterator for AllStringIter {
             self.0.push(std::char::from_u32(c as u32 + 1).unwrap());
         }
 
-        if i == self.1 as usize {
+        if i == (self.1+1) as usize  {
             return None;
         }
 
@@ -91,7 +79,22 @@ fn brute(types: Vec<HashType>, hash: String, len: u8) -> Vec<Option<String>> {
                     false => None,
                 }
             }),
-            HashType::BCrypt => unimplemented!(),
+            HashType::BCrypt => {
+                let split_hash = hash.split("$").collect::<Vec<_>>();
+                let rounds = split_hash[2].parse::<u32>().unwrap();
+                let salt: [u8; 16] = split_hash[3].as_bytes()[0..16].try_into().expect("SALT INCORRECT");
+
+                println!("decrypting bcrypt with parameters");
+                println!("rounds: {}", rounds);
+                println!("salt: {:?}", String::from_utf8(salt.to_vec()));
+
+                AllStringIter::new(len).par_bridge().find_map_first(|f| {
+                    match bcrypt::hash_with_salt(hash.clone(), rounds, salt).unwrap().to_string() == hash {
+                        true => Some(f),
+                        false => None,
+                    }
+                })
+            },
         })
         .collect::<Vec<Option<String>>>()
 }

@@ -8,7 +8,11 @@ A copy-cat `hashcat` utility implemented semi-functionally.
 `thrash -h`
 
 ### Crack MD5 hash
-`thrash -i "4124bc0a9335c27f086f24ba207a4912" -m -f`
+`thrash -i "5d41402abc4b2a76b9719d911017c592" -m -f -p 5`
+
+
+
+`thrash -i '$2b$04$2xMnEyWVHyB3WFXNIAOXRukOLCphA2EWMMjDtxUmd18WXrjE4PSPG' -b -f -p 5`
 
 ## Tech Stack
 - `md5`
