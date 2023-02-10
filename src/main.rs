@@ -68,10 +68,31 @@ impl Iterator for AllStringIter {
     }
 }
 
+enum AttackList {
+    Brute(AllStringIter),
+    Dictionary(Vec<String>),
+    Rule(Vec<String>),
+}
+
+impl Iterator for AttackList {
+    type Item = String;
+
+    fn next(&mut self) -> Option<String> {
+        match self {
+            Self::Brute(x) => x.next(),
+            Self::Dictionary(x) => x.iter().next().cloned(),
+            Self::Rule(x) => x.iter().next().cloned(),
+        }
+    }
+}
+
 /// executes an iter using `AllStringIter` in parallel using `rayon`.
-fn compare(predicate: fn(&str, &str) -> bool, len: u8, hash: &str) -> Option<String> {
-    AllStringIter::new(len)
-        .par_bridge()
+fn compare(
+    predicate: fn(&str, &str) -> bool,
+    list: AttackList,
+    hash: &str,
+) -> Option<String> {
+    list.par_bridge()
         .find_map_first(|f| match predicate(&f, hash) {
             true => Some(f),
             false => None,
@@ -80,11 +101,17 @@ fn compare(predicate: fn(&str, &str) -> bool, len: u8, hash: &str) -> Option<Str
 
 /// takes all `types` and performs a brute force attack using each, returning the result.
 fn brute(hashtype: HashType, hash: String, len: u8) -> Option<String> {
+    let list = AttackList::Brute(AllStringIter::new(len));
+
     match hashtype {
-        HashType::MD5 => compare(|x, y| format!("{:?}", md5::compute(x)) == y, len, &hash),
+        HashType::MD5 => compare(
+            |x, y| format!("{:?}", md5::compute(x)) == y,
+            list,
+            &hash,
+        ),
         HashType::BCrypt => compare(
             |x, y| bcrypt::verify(x, y).expect("Input hash was not proper bcrypt hash."),
-            len,
+            list,
             &hash,
         ),
     }
