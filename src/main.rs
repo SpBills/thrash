@@ -56,7 +56,7 @@ impl Iterator for AllStringIter {
             self.0.push(std::char::from_u32(c as u32 + 1).unwrap());
         }
 
-        if i == (self.1+1) as usize  {
+        if i == (self.1 + 1) as usize {
             return None;
         }
 
@@ -68,44 +68,38 @@ impl Iterator for AllStringIter {
     }
 }
 
-/// takes all `types` and performs a brute force attack using each, returning the result.
-fn brute(types: Vec<HashType>, hash: String, len: u8) -> Vec<Option<String>> {
-    types
-        .iter()
-        .map(|hashtype| match hashtype {
-            HashType::MD5 => AllStringIter::new(len).par_bridge().find_map_first(|f| {
-                match format!("{:?}", md5::compute(&f)) == hash {
-                    true => Some(f),
-                    false => None,
-                }
-            }),
-            HashType::BCrypt => {
-                AllStringIter::new(len).par_bridge().find_map_first(|f| {
-                    match bcrypt::verify(&f, &hash).unwrap() {
-                        true => Some(f),
-                        false => None,
-                    }
-                })
-            },
+fn compare(predicate: fn(&str, &str) -> bool, len: u8, hash: &str) -> Option<String> {
+    AllStringIter::new(len)
+        .par_bridge()
+        .find_map_first(|f| match predicate(&f, hash) {
+            true => Some(f),
+            false => None,
         })
-        .collect::<Vec<Option<String>>>()
+}
+
+/// takes all `types` and performs a brute force attack using each, returning the result.
+fn brute(hashtype: HashType, hash: String, len: u8) -> Option<String> {
+    match hashtype {
+        HashType::MD5 => compare(|x, y| format!("{:?}", md5::compute(x)) == y, len, &hash),
+        HashType::BCrypt => compare(
+            |x, y| bcrypt::verify(x, y).expect("Input hash was not proper bcrypt hash."),
+            len,
+            &hash,
+        ),
+    }
 }
 
 fn main() {
     let args = Args::parse();
 
-    let mut hash_types = vec![];
-    if args.bcrypt {
-        hash_types.push(HashType::BCrypt);
-    }
+    let out = match (args.md5, args.bcrypt) {
+        (false, true) => brute(HashType::BCrypt, args.input, args.password_length),
+        (true, false) => brute(HashType::MD5, args.input, args.password_length),
+        _ => panic!("Please specify either -b or -m"),
+    };
 
-    if args.md5 {
-        hash_types.push(HashType::MD5);
-    }
-
-    if args.force {
-        let results = brute(hash_types, args.input, args.password_length);
-
-        println!("{:?}", results)
+    match out {
+        Some(x) => println!("Found hash {x}"),
+        None => println!("Hash not found."),
     }
 }
