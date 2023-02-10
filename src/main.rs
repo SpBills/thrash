@@ -80,16 +80,8 @@ fn brute(types: Vec<HashType>, hash: String, len: u8) -> Vec<Option<String>> {
                 }
             }),
             HashType::BCrypt => {
-                let split_hash = hash.split("$").collect::<Vec<_>>();
-                let rounds = split_hash[2].parse::<u32>().unwrap();
-                let salt: [u8; 16] = split_hash[3].as_bytes()[0..16].try_into().expect("SALT INCORRECT");
-
-                println!("decrypting bcrypt with parameters");
-                println!("rounds: {}", rounds);
-                println!("salt: {:?}", String::from_utf8(salt.to_vec()));
-
                 AllStringIter::new(len).par_bridge().find_map_first(|f| {
-                    match bcrypt::hash_with_salt(hash.clone(), rounds, salt).unwrap().to_string() == hash {
+                    match bcrypt::verify(&f, &hash).unwrap() {
                         true => Some(f),
                         false => None,
                     }
