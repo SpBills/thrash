@@ -68,6 +68,7 @@ impl Iterator for AllStringIter {
     }
 }
 
+/// executes an iter using `AllStringIter` in parallel using `rayon`.
 fn compare(predicate: fn(&str, &str) -> bool, len: u8, hash: &str) -> Option<String> {
     AllStringIter::new(len)
         .par_bridge()
